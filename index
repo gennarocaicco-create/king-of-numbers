@@ -29,11 +29,13 @@
   // apiKey, authDomain, projectId, appId : Console > ⚙️ Paramètres du projet > section "Tes applications".
   // databaseURL : c'est l'adresse de TA Realtime Database (ex. https://king-of-bumbers-default-rtdb.europe-west1.firebasedatabase.app).
   const firebaseConfig = {
-    apiKey: "TODO",
-    authDomain: "TODO.firebaseapp.com",
-    databaseURL: "TODO",
-    projectId: "TODO",
-    appId: "TODO",
+    apiKey: "AIzaSyBT-2trnl2go6J4BfO48oOUj9TZ57J4LIg",
+    authDomain: "king-of-bumbers.firebaseapp.com",
+    databaseURL: "https://king-of-bumbers-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "king-of-bumbers",
+    storageBucket: "king-of-bumbers.firebasestorage.app",
+    messagingSenderId: "854287234293",
+    appId: "1:854287234293:web:0c1bc7ef2fed4159e241bc",
   };
 
   if (firebaseConfig.databaseURL !== "TODO") {
