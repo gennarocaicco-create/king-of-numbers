@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#0a0e14" />
 <title>Roi des Numéros</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPHBhdGggZD0iTTI2IDkgQzI4IDEzIDM2IDEzIDM4IDkgTDQ3IDExIEw2MSAyMSBMNTQgMzEgTDQ5IDI3IEw0OSA1NyBMMTUgNTcgTDE1IDI3IEwxMCAzMSBMMyAyMSBMMTcgMTEgWiIKICAgICAgICBmaWxsPSIjZTQwMDJiIiBzdHJva2U9IiNiNTAwMjIiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CiAgPHRleHQgeD0iMzIiIHk9IjQ2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsIEhlbHZldGljYSwgc2Fucy1zZXJpZiIKICAgICAgICBmb250LXdlaWdodD0iOTAwIiBmb250LXNpemU9IjMwIiBmaWxsPSIjZmZmZmZmIj4xMDwvdGV4dD4KPC9zdmc+Cg==" />
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPHBhdGggZD0iTTI2IDkgQzI4IDEzIDM2IDEzIDM4IDkgTDQ3IDExIEw2MSAyMSBMNTQgMzEgTDQ5IDI3IEw0OSA1NyBMMTUgNTcgTDE1IDI3IEwxMCAzMSBMMyAyMSBMMTcgMTEgWiIKICAgICAgICBmaWxsPSIjZTQwMDJiIiBzdHJva2U9IiNiNTAwMjIiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CiAgPHRleHQgeD0iMzIiIHk9IjQ2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsIEhlbHZldGljYSwgc2Fucy1zZXJpZiIKICAgICAgICBmb250LXdlaWdodD0iOTAwIiBmb250LXNpemU9IjMwIiBmaWxsPSIjZmZmZmZmIj4xMDwvdGV4dD4KPC9zdmc+Cg==" />
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Anton&family=Sora:wght@400;600;700;800&display=swap');
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
