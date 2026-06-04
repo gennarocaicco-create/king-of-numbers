@@ -24,7 +24,7 @@
 <!-- 1) Firebase REALTIME DATABASE (classement partagé). Tant que la config = "TODO", le jeu reste LOCAL. -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, set, query, orderByChild, limitToLast, onValue }
+  import { getDatabase, ref, set, remove, query, orderByChild, limitToLast, onValue }
     from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
   // ----- TA CONFIG ICI -----
@@ -56,6 +56,9 @@
           arr.reverse(); // du plus haut ELO au plus bas
           cb(arr);
         });
+      },
+      async deleteProfile(id) {
+        await remove(ref(db, "kings/" + id));
       },
     };
     window.dispatchEvent(new Event("kingdb-ready"));
@@ -147,8 +150,12 @@ const localDB = {
   ready: false,
   async saveProfile(p) { const all = store.get("kings", {}); all[p.id] = p; store.set("kings", all); localSubs.forEach((cb) => cb(localList())); },
   subscribeLeaderboard(cb) { localSubs.push(cb); cb(localList()); return () => { const i = localSubs.indexOf(cb); if (i >= 0) localSubs.splice(i, 1); }; },
+  async deleteProfile(id) { const all = store.get("kings", {}); delete all[id]; store.set("kings", all); localSubs.forEach((cb) => cb(localList())); },
 };
 const getDB = () => (window.KingDB ? window.KingDB : localDB);
+
+/* ---------- code admin (change-le si tu veux) ---------- */
+const ADMIN_CODE = "Berlin";
 
 /* ---------- utils ---------- */
 const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, "").trim();
@@ -201,6 +208,7 @@ function App() {
         {(screen === "quiz" || screen === "reverse") && <Game mode={screen} go={go} profile={profile} save={save} />}
         {screen === "duel" && <Duel go={go} />}
         {screen === "board" && <Leaderboard go={go} profile={profile} />}
+        {screen === "admin" && <Admin go={go} />}
       </div>
     </div>
   );
@@ -208,16 +216,31 @@ function App() {
 
 function Onboard({ save, go }) {
   const [v, setV] = useState("");
+  const [list, setList] = useState([]);
+  const [err, setErr] = useState("");
+  useEffect(() => { const u = getDB().subscribeLeaderboard(setList); return () => u && u(); }, []);
+
+  const register = () => {
+    const name = v.trim();
+    if (!name) return;
+    const taken = list.some((p) => norm(p.pseudo || "") === norm(name));
+    if (taken) { setErr("Ce nom est déjà pris. Choisis-en un autre."); return; }
+    save({ pseudo: name });
+    go("home");
+  };
+
   return (
     <div style={{ marginTop: 60, textAlign: "center" }}>
       <h1 style={{ fontFamily: "Anton, sans-serif", fontSize: 48, lineHeight: .9, textTransform: "uppercase" }}>
         Roi des <span style={{ color: C.lime }}>Numéros</span></h1>
-      <p style={{ color: C.mute, margin: "16px 0 24px" }}>Choisis ton pseudo pour entrer au classement.</p>
-      <input value={v} maxLength={20} onChange={(e) => setV(e.target.value)} placeholder="Ton pseudo…"
-        onKeyDown={(e) => e.key === "Enter" && v.trim() && (save({ pseudo: v.trim() }), go("home"))}
-        style={{ width: "100%", background: "#0c1119", border: `1px solid ${C.line}`, color: C.ink, borderRadius: 14, padding: 16, fontSize: 17, outline: "none", fontFamily: "Sora", textAlign: "center" }} />
-      <button disabled={!v.trim()} onClick={() => { save({ pseudo: v.trim() }); go("home"); }}
-        style={{ ...btnPrimary, background: v.trim() ? C.lime : "#1c2531", color: v.trim() ? "#0a0e14" : C.mute }}>C'est parti</button>
+      <p style={{ color: C.mute, margin: "16px 0 6px" }}>Choisis ton pseudo pour entrer au classement.</p>
+      <p style={{ color: C.mute, fontSize: 12, margin: "0 0 24px" }}>⚠️ Une seule inscription : ton nom sera définitif.</p>
+      <input value={v} maxLength={20} onChange={(e) => { setV(e.target.value); setErr(""); }} placeholder="Ton pseudo…"
+        onKeyDown={(e) => e.key === "Enter" && register()}
+        style={{ width: "100%", background: "#0c1119", border: `1px solid ${err ? C.red : C.line}`, color: C.ink, borderRadius: 14, padding: 16, fontSize: 17, outline: "none", fontFamily: "Sora", textAlign: "center" }} />
+      {err && <p style={{ color: C.red, fontSize: 13, marginTop: 8 }}>{err}</p>}
+      <button disabled={!v.trim()} onClick={register}
+        style={{ ...btnPrimary, background: v.trim() ? C.lime : "#1c2531", color: v.trim() ? "#0a0e14" : C.mute }}>M'inscrire</button>
     </div>
   );
 }
@@ -265,11 +288,18 @@ function Game({ mode, go, profile, save }) {
   const [streak, setStreak] = useState(0);
   const [elo, setElo] = useState(profile.elo);
   const [confetti, setConfetti] = useState(false);
+  const [now, setNow] = useState(Date.now());
   const startRef = useRef(Date.now());
   const inputRef = useRef(null);
   const q = deck.current[idx % deck.current.length];
   const r = RARITY[q.rarity];
-  useEffect(() => { startRef.current = Date.now(); setTimeout(() => inputRef.current && inputRef.current.focus(), 50); }, [idx]);
+  const elapsed = (now - startRef.current) / 1000;
+  useEffect(() => { startRef.current = Date.now(); setNow(Date.now()); setTimeout(() => inputRef.current && inputRef.current.focus(), 50); }, [idx]);
+  useEffect(() => {
+    if (phase !== "ask") return;
+    const t = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(t);
+  }, [phase, idx]);
   const submit = () => {
     if (phase !== "ask" || val === "") return;
     const sec = (Date.now() - startRef.current) / 1000;
@@ -296,6 +326,14 @@ function Game({ mode, go, profile, save }) {
         <span style={{ color: streak > 1 ? C.lime : C.mute }}>{streak > 1 ? `⚡ ${streak} d'affilée` : "Série 0"}</span>
         <span style={{ color: C.mute }}>ELO <strong style={{ color: C.lime }}>{elo}</strong></span>
       </div>
+      {phase === "ask" && (
+        <div style={{ textAlign: "center", marginBottom: 12 }}>
+          <span style={{ fontFamily: "Anton", fontSize: 32, letterSpacing: 1,
+            color: elapsed <= 5 ? C.green : elapsed <= 15 ? C.lime : C.red }}>
+            ⏱ {elapsed.toFixed(1)}s
+          </span>
+        </div>
+      )}
       <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 22, padding: 22, position: "relative", overflow: "hidden", animation: "pop .25s ease both" }}>
         <span style={{ position: "absolute", top: 14, right: 16, fontSize: 11, fontWeight: 700, color: r.color, border: `1px solid ${r.color}55`, borderRadius: 999, padding: "3px 10px" }}>{r.label} +{r.bonus}</span>
         {mode === "quiz" ? (
@@ -343,10 +381,17 @@ function Duel({ go }) {
   const [sa, setSa] = useState(0); const [sb, setSb] = useState(0);
   const [val, setVal] = useState(""); const [step, setStep] = useState("answer"); const [msg, setMsg] = useState("");
   const startRef = useRef(Date.now());
+  const [now, setNow] = useState(Date.now());
   const q = deck.current[i % deck.current.length]; const r = RARITY[q.rarity];
   const names = ["Joueur A", "Joueur B"]; const colors = ["#5ad1ff", "#ff7eb6"];
   const winner = sa >= 100 ? 0 : sb >= 100 ? 1 : null;
-  useEffect(() => { startRef.current = Date.now(); }, [i, step]);
+  const elapsed = (now - startRef.current) / 1000;
+  useEffect(() => { startRef.current = Date.now(); setNow(Date.now()); }, [i, step]);
+  useEffect(() => {
+    if (step === "reveal") return;
+    const t = setInterval(() => setNow(Date.now()), 100);
+    return () => clearInterval(t);
+  }, [i, step]);
   const award = (w, p) => (w === 0 ? setSa((s) => s + p) : setSb((s) => s + p));
   const tryAnswer = () => {
     if (val === "") return;
@@ -380,6 +425,8 @@ function Duel({ go }) {
       <div style={{ textAlign: "center", fontSize: 13, marginBottom: 10, animation: step === "steal" ? "pulse 1s infinite" : "none",
         color: step === "steal" ? colors[1 - turn] : C.mute, fontWeight: step === "steal" ? 700 : 400 }}>
         {step === "steal" ? `À ${names[1 - turn]} de voler !` : `Au tour de ${names[turn]}`}
+        {step !== "reveal" && <span style={{ fontFamily: "Anton", fontSize: 18, marginLeft: 10,
+          color: elapsed <= 5 ? C.green : elapsed <= 15 ? C.lime : C.red }}>⏱ {elapsed.toFixed(1)}s</span>}
       </div>
       <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 20, padding: 20, position: "relative" }}>
         <span style={{ position: "absolute", top: 12, right: 14, fontSize: 11, fontWeight: 700, color: r.color, border: `1px solid ${r.color}55`, borderRadius: 999, padding: "2px 9px" }}>{r.label} +{r.bonus}</span>
@@ -446,6 +493,70 @@ function Leaderboard({ go, profile }) {
       {!live && <p style={{ color: C.mute, fontSize: 12, textAlign: "center", marginTop: 20, lineHeight: 1.6 }}>
         Classement local. Renseigne ta config Firebase en haut du fichier pour le partage entre joueurs.</p>}
       <button onClick={() => go("home")} style={btnPrimary}>Rejouer</button>
+      <button onClick={() => go("admin")} style={{ width: "100%", marginTop: 10, background: "none", border: "none",
+        color: C.mute, fontSize: 12, cursor: "pointer", fontFamily: "Sora", textDecoration: "underline" }}>
+        🔒 Admin
+      </button>
+    </div>
+  );
+}
+
+function Admin({ go }) {
+  const [code, setCode] = useState("");
+  const [ok, setOk] = useState(false);
+  const [err, setErr] = useState("");
+  const [list, setList] = useState([]);
+  useEffect(() => { if (!ok) return; const u = getDB().subscribeLeaderboard(setList); return () => u && u(); }, [ok]);
+
+  const tryLogin = () => {
+    if (code === ADMIN_CODE) { setOk(true); setErr(""); }
+    else setErr("Code incorrect.");
+  };
+  const del = (p) => {
+    if (window.confirm(`Supprimer "${p.pseudo}" du classement ? Cette action est définitive.`)) {
+      getDB().deleteProfile(p.id);
+    }
+  };
+
+  if (!ok) return (
+    <div>
+      <TopBar go={go} title="Admin" right="" />
+      <div style={{ marginTop: 40, textAlign: "center" }}>
+        {ic("🔒", 40)}
+        <p style={{ color: C.mute, margin: "12px 0 18px" }}>Entre le code admin.</p>
+        <input type="password" value={code} onChange={(e) => { setCode(e.target.value); setErr(""); }}
+          onKeyDown={(e) => e.key === "Enter" && tryLogin()} placeholder="Code…"
+          style={{ width: "100%", background: "#0c1119", border: `1px solid ${err ? C.red : C.line}`, color: C.ink, borderRadius: 14, padding: 16, fontSize: 17, outline: "none", fontFamily: "Sora", textAlign: "center" }} />
+        {err && <p style={{ color: C.red, fontSize: 13, marginTop: 8 }}>{err}</p>}
+        <button onClick={tryLogin} style={btnPrimary}>Entrer</button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div>
+      <TopBar go={go} title="Admin · participants" right={`${list.length}`} />
+      <p style={{ color: C.mute, fontSize: 13, margin: "14px 0" }}>Appuie sur 🗑️ pour retirer un participant du classement.</p>
+      {list.length === 0 ? (
+        <p style={{ color: C.mute, textAlign: "center", marginTop: 20 }}>Aucun participant.</p>
+      ) : (
+        <div style={{ display: "grid", gap: 8 }}>
+          {list.map((p) => (
+            <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: C.panel,
+              border: `1px solid ${C.line}`, borderRadius: 14, padding: "12px 14px" }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700 }}>{p.pseudo}</div>
+                <div style={{ color: C.mute, fontSize: 12 }}>ELO {p.elo} · {p.games || 0} parties</div>
+              </div>
+              <button onClick={() => del(p)} style={{ background: `${C.red}1a`, border: `1px solid ${C.red}55`,
+                color: C.red, borderRadius: 10, padding: "8px 12px", cursor: "pointer", fontFamily: "Sora", fontWeight: 700 }}>
+                🗑️
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <button onClick={() => go("board")} style={btnPrimary}>Retour au classement</button>
     </div>
   );
 }
