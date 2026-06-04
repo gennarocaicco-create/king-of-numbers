@@ -48,9 +48,9 @@
     const db = getDatabase(initializeApp(firebaseConfig));
     window.KingDB = {
       ready: true,
-      async saveProfile({ id, pseudo, elo, games, best }) {
+      async saveProfile({ id, pseudo, elo, games, best, pwd }) {
         await set(ref(db, "kings/" + id),
-          { pseudo, elo, games, best, updatedAt: Date.now() });
+          { pseudo, elo, games, best, pwd: pwd || null, updatedAt: Date.now() });
       },
       subscribeLeaderboard(cb) {
         const q = query(ref(db, "kings"), orderByChild("elo"), limitToLast(50));
@@ -173,6 +173,15 @@ const nameMatches = (input, player) => {
 const timeScore = (sec) => (sec <= 5 ? 10 : sec <= 15 ? 7 : 5);
 const shuffle = (a) => [...a].sort(() => Math.random() - 0.5);
 const uid = () => "u_" + Math.random().toString(36).slice(2, 10);
+async function hashPwd(s) {
+  try {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("kdn:" + s));
+    return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+  } catch {
+    let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+    return "f" + h.toString(16);
+  }
+}
 
 const C = { bg: "#0a0e14", panel: "#121822", line: "#1f2937", lime: "#c6ff00", ink: "#e7ecf3", mute: "#7b8794", red: "#ff5d5d", green: "#3ee08a" };
 
@@ -194,10 +203,10 @@ function Confetti() {
 function App() {
   const [profile, setProfile] = useState(() => {
     let p = store.get("profile", null);
-    if (!p) { p = { id: uid(), pseudo: "", elo: 1200, games: 0, best: 0 }; store.set("profile", p); }
+    if (!p) { p = { id: uid(), pseudo: "", elo: 1200, games: 0, best: 0, pwd: "" }; store.set("profile", p); }
     return p;
   });
-  const [screen, setScreen] = useState(profile.pseudo ? "home" : "onboard");
+  const [screen, setScreen] = useState(profile.pseudo ? (profile.pwd ? "home" : "setpwd") : "onboard");
   const save = (patch) => setProfile((p) => {
     const np = { ...p, ...patch }; store.set("profile", np);
     if (np.pseudo) getDB().saveProfile(np); return np;
@@ -208,6 +217,7 @@ function App() {
       backgroundImage: "radial-gradient(900px 500px at 80% -10%, rgba(198,255,0,.08), transparent 60%), radial-gradient(700px 400px at -10% 110%, rgba(90,209,255,.07), transparent 60%)" }}>
       <div style={{ maxWidth: 460, margin: "0 auto", padding: "20px 16px 40px" }}>
         {screen === "onboard" && <Onboard save={save} go={go} />}
+        {screen === "setpwd" && <SetPwd profile={profile} save={save} go={go} />}
         {screen === "home" && <HomeScreen go={go} profile={profile} />}
         {(screen === "quiz" || screen === "reverse") && <Game mode={screen} go={go} profile={profile} save={save} />}
         {screen === "duel" && <Duel go={go} />}
@@ -220,31 +230,83 @@ function App() {
 
 function Onboard({ save, go }) {
   const [v, setV] = useState("");
+  const [pw, setPw] = useState("");
   const [list, setList] = useState([]);
   const [err, setErr] = useState("");
+  const [busy, setBusy] = useState(false);
   useEffect(() => { const u = getDB().subscribeLeaderboard(setList); return () => u && u(); }, []);
 
-  const register = () => {
+  const submit = async () => {
     const name = v.trim();
-    if (!name) return;
-    const taken = list.some((p) => norm(p.pseudo || "") === norm(name));
-    if (taken) { setErr("Ce nom est déjà pris. Choisis-en un autre."); return; }
-    save({ pseudo: name });
-    go("home");
+    if (!name || !pw || busy) return;
+    setBusy(true);
+    const h = await hashPwd(pw);
+    const existing = list.find((p) => norm(p.pseudo || "") === norm(name));
+    if (!existing) {
+      // nouveau joueur : inscription
+      save({ pseudo: name, pwd: h });
+      go("home");
+    } else if (!existing.pwd) {
+      // ancien compte sans mot de passe : on le revendique
+      save({ id: existing.id, pseudo: existing.pseudo, pwd: h,
+        elo: existing.elo ?? 1200, games: existing.games || 0, best: existing.best || 0 });
+      go("home");
+    } else if (existing.pwd === h) {
+      // bon mot de passe : connexion / récupération du compte
+      save({ id: existing.id, pseudo: existing.pseudo, pwd: h,
+        elo: existing.elo ?? 1200, games: existing.games || 0, best: existing.best || 0 });
+      go("home");
+    } else {
+      setErr("Ce nom est déjà pris. Si c'est le tien, entre le bon mot de passe.");
+    }
+    setBusy(false);
   };
 
+  const inputStyle = (bad) => ({ width: "100%", background: "#0c1119", border: `1px solid ${bad ? C.red : C.line}`,
+    color: C.ink, borderRadius: 14, padding: 16, fontSize: 17, outline: "none", fontFamily: "Sora", textAlign: "center" });
+
   return (
-    <div style={{ marginTop: 60, textAlign: "center" }}>
+    <div style={{ marginTop: 50, textAlign: "center" }}>
       <h1 style={{ fontFamily: "Anton, sans-serif", fontSize: 48, lineHeight: .9, textTransform: "uppercase" }}>
         Roi des <span style={{ color: C.lime }}>Numéros</span></h1>
-      <p style={{ color: C.mute, margin: "16px 0 6px" }}>Choisis ton pseudo pour entrer au classement.</p>
-      <p style={{ color: C.mute, fontSize: 12, margin: "0 0 24px" }}>⚠️ Une seule inscription : ton nom sera définitif.</p>
+      <p style={{ color: C.mute, margin: "16px 0 6px" }}>Inscris-toi avec un pseudo et un mot de passe.</p>
+      <p style={{ color: C.mute, fontSize: 12, margin: "0 0 22px" }}>🔑 Le mot de passe protège ton pseudo et te permet de te reconnecter sur un autre appareil.</p>
       <input value={v} maxLength={20} onChange={(e) => { setV(e.target.value); setErr(""); }} placeholder="Ton pseudo…"
-        onKeyDown={(e) => e.key === "Enter" && register()}
-        style={{ width: "100%", background: "#0c1119", border: `1px solid ${err ? C.red : C.line}`, color: C.ink, borderRadius: 14, padding: 16, fontSize: 17, outline: "none", fontFamily: "Sora", textAlign: "center" }} />
+        style={{ ...inputStyle(err), marginBottom: 10 }} />
+      <input type="password" value={pw} onChange={(e) => { setPw(e.target.value); setErr(""); }} placeholder="Mot de passe…"
+        onKeyDown={(e) => e.key === "Enter" && submit()} style={inputStyle(err)} />
       {err && <p style={{ color: C.red, fontSize: 13, marginTop: 8 }}>{err}</p>}
-      <button disabled={!v.trim()} onClick={register}
-        style={{ ...btnPrimary, background: v.trim() ? C.lime : "#1c2531", color: v.trim() ? "#0a0e14" : C.mute }}>M'inscrire</button>
+      <button disabled={!v.trim() || !pw || busy} onClick={submit}
+        style={{ ...btnPrimary, background: (v.trim() && pw && !busy) ? C.lime : "#1c2531", color: (v.trim() && pw && !busy) ? "#0a0e14" : C.mute }}>
+        {busy ? "…" : "M'inscrire / Me connecter"}
+      </button>
+    </div>
+  );
+}
+
+function SetPwd({ profile, save, go }) {
+  const [pw, setPw] = useState("");
+  const [busy, setBusy] = useState(false);
+  const submit = async () => {
+    if (!pw || busy) return;
+    setBusy(true);
+    const h = await hashPwd(pw);
+    save({ pwd: h });
+    go("home");
+  };
+  return (
+    <div style={{ marginTop: 60, textAlign: "center" }}>
+      {ic("🔑", 40)}
+      <h2 style={{ fontFamily: "Anton, sans-serif", fontSize: 30, margin: "12px 0 6px", textTransform: "uppercase" }}>
+        Protège ton compte</h2>
+      <p style={{ color: C.mute, margin: "0 0 22px" }}>Salut {profile.pseudo} ! Choisis un mot de passe pour sécuriser ton pseudo.</p>
+      <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="Mot de passe…"
+        onKeyDown={(e) => e.key === "Enter" && submit()}
+        style={{ width: "100%", background: "#0c1119", border: `1px solid ${C.line}`, color: C.ink, borderRadius: 14, padding: 16, fontSize: 17, outline: "none", fontFamily: "Sora", textAlign: "center" }} />
+      <button disabled={!pw || busy} onClick={submit}
+        style={{ ...btnPrimary, background: (pw && !busy) ? C.lime : "#1c2531", color: (pw && !busy) ? "#0a0e14" : C.mute }}>
+        {busy ? "…" : "Valider"}
+      </button>
     </div>
   );
 }
