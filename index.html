@@ -15,6 +15,7 @@
   @keyframes pop { 0%{transform:scale(.9);opacity:0} 100%{transform:scale(1);opacity:1} }
   @keyframes fall { to { transform: translateY(110vh) rotate(540deg); opacity:0 } }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  @keyframes spin { to { transform: rotate(360deg) } }
   input::placeholder { color:#5a6472; }
 </style>
 </head>
@@ -457,19 +458,28 @@ function Duel({ go }) {
 function Leaderboard({ go, profile }) {
   const [list, setList] = useState([]);
   const [live, setLive] = useState(getDB().ready);
+  const [reload, setReload] = useState(0);
+  const [spin, setSpin] = useState(false);
   useEffect(() => {
     const sub = () => { setLive(getDB().ready); return getDB().subscribeLeaderboard(setList); };
     let unsub = sub();
     const onReady = () => { if (unsub) unsub(); unsub = sub(); };
     window.addEventListener("kingdb-ready", onReady);
     return () => { if (unsub) unsub(); window.removeEventListener("kingdb-ready", onReady); };
-  }, []);
+  }, [reload]);
+  const refresh = () => { setSpin(true); setReload((n) => n + 1); setTimeout(() => setSpin(false), 600); };
   const medals = ["#ffd166", "#c0c8d4", "#cd7f4d"];
   return (
     <div>
       <TopBar go={go} title="Classement" right={live ? "● en direct" : "local"} />
       <div style={{ textAlign: "center", margin: "18px 0" }}>{ic("👑", 40)}
         <div style={{ color: C.mute, fontSize: 13, marginTop: 4 }}>Le vrai roi des numéros</div></div>
+      <button onClick={refresh} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+        width: "100%", background: C.panel, border: `1px solid ${C.line}`, color: C.ink, borderRadius: 12,
+        padding: "10px 14px", marginBottom: 14, cursor: "pointer", fontFamily: "Sora", fontWeight: 700, fontSize: 14 }}>
+        <span style={{ display: "inline-block", animation: spin ? "spin .6s linear" : "none" }}>🔄</span>
+        {spin ? "Actualisation…" : "Actualiser le classement"}
+      </button>
       {list.length === 0 ? (
         <p style={{ color: C.mute, textAlign: "center", marginTop: 30 }}>Aucune partie enregistrée. Joue une manche !</p>
       ) : (
