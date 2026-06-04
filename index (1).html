@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="theme-color" content="#0a0e14" />
+<title>Roi des Numéros</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPHBhdGggZD0iTTI2IDkgQzI4IDEzIDM2IDEzIDM4IDkgTDQ3IDExIEw2MSAyMSBMNTQgMzEgTDQ5IDI3IEw0OSA1NyBMMTUgNTcgTDE1IDI3IEwxMCAzMSBMMyAyMSBMMTcgMTEgWiIKICAgICAgICBmaWxsPSIjZTQwMDJiIiBzdHJva2U9IiNiNTAwMjIiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CiAgPHRleHQgeD0iMzIiIHk9IjQ2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsIEhlbHZldGljYSwgc2Fucy1zZXJpZiIKICAgICAgICBmb250LXdlaWdodD0iOTAwIiBmb250LXNpemU9IjMwIiBmaWxsPSIjZmZmZmZmIj4xMDwvdGV4dD4KPC9zdmc+Cg==" />
+<link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+CiAgPHBhdGggZD0iTTI2IDkgQzI4IDEzIDM2IDEzIDM4IDkgTDQ3IDExIEw2MSAyMSBMNTQgMzEgTDQ5IDI3IEw0OSA1NyBMMTUgNTcgTDE1IDI3IEwxMCAzMSBMMyAyMSBMMTcgMTEgWiIKICAgICAgICBmaWxsPSIjZTQwMDJiIiBzdHJva2U9IiNiNTAwMjIiIHN0cm9rZS13aWR0aD0iMS41IiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+CiAgPHRleHQgeD0iMzIiIHk9IjQ2IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0iQXJpYWwsIEhlbHZldGljYSwgc2Fucy1zZXJpZiIKICAgICAgICBmb250LXdlaWdodD0iOTAwIiBmb250LXNpemU9IjMwIiBmaWxsPSIjZmZmZmZmIj4xMDwvdGV4dD4KPC9zdmc+Cg==" />
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Anton&family=Sora:wght@400;600;700;800&display=swap');
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; background: #0a0e14; }
+  #root { min-height: 100dvh; }
+  @keyframes pop { 0%{transform:scale(.9);opacity:0} 100%{transform:scale(1);opacity:1} }
+  @keyframes fall { to { transform: translateY(110vh) rotate(540deg); opacity:0 } }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.35} }
+  input::placeholder { color:#5a6472; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- 1) Firebase REALTIME DATABASE (classement partagé). Tant que la config = "TODO", le jeu reste LOCAL. -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, set, query, orderByChild, limitToLast, onValue }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  // ----- TA CONFIG ICI -----
+  // apiKey, authDomain, projectId, appId : Console > ⚙️ Paramètres du projet > section "Tes applications".
+  // databaseURL : c'est l'adresse de TA Realtime Database (ex. https://king-of-bumbers-default-rtdb.europe-west1.firebasedatabase.app).
+  const firebaseConfig = {
+    apiKey: "AIzaSyBT-2trnl2go6J4BfO48oOUj9TZ57J4LIg",
+    authDomain: "king-of-bumbers.firebaseapp.com",
+    databaseURL: "https://king-of-bumbers-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "king-of-bumbers",
+    storageBucket: "king-of-bumbers.firebasestorage.app",
+    messagingSenderId: "854287234293",
+    appId: "1:854287234293:web:0c1bc7ef2fed4159e241bc",
+  };
+
+  if (firebaseConfig.databaseURL !== "TODO") {
+    const db = getDatabase(initializeApp(firebaseConfig));
+    window.KingDB = {
+      ready: true,
+      async saveProfile({ id, pseudo, elo, games, best }) {
+        await set(ref(db, "kings/" + id),
+          { pseudo, elo, games, best, updatedAt: Date.now() });
+      },
+      subscribeLeaderboard(cb) {
+        const q = query(ref(db, "kings"), orderByChild("elo"), limitToLast(50));
+        return onValue(q, (snap) => {
+          const arr = [];
+          snap.forEach((c) => arr.push({ id: c.key, ...c.val() }));
+          arr.reverse(); // du plus haut ELO au plus bas
+          cb(arr);
+        });
+      },
+    };
+    window.dispatchEvent(new Event("kingdb-ready"));
+  }
+  // Règles Realtime Database (onglet "Règles") :
+  // { "rules": { "kings": { ".read": true, ".write": true, ".indexOn": "elo" } } }
+</script>
+
+<!-- 2) React + Babel par CDN -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+<!-- 3) Le jeu -->
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useMemo } = React;
+
+/* ---------- icônes (emoji, zéro dépendance) ---------- */
+const ic = (e, s = 20) => <span style={{ fontSize: s, lineHeight: 1 }}>{e}</span>;
+
+/* ---------- BASE DE DONNÉES (à enrichir avec ton ami) ---------- */
+const DB = [
+  { player: "Cristiano Ronaldo", club: "Manchester United", season: "2007/08", number: 7, rarity: "common" },
+  { player: "Cristiano Ronaldo", club: "Real Madrid", season: "2014/15", number: 7, rarity: "common" },
+  { player: "Lionel Messi", club: "FC Barcelona", season: "2011/12", number: 10, rarity: "common" },
+  { player: "Zlatan Ibrahimović", club: "Paris Saint-Germain", season: "2014/15", number: 10, rarity: "common" },
+  { player: "Neymar", club: "Paris Saint-Germain", season: "2017/18", number: 10, rarity: "common" },
+  { player: "Kylian Mbappé", club: "Paris Saint-Germain", season: "2021/22", number: 7, rarity: "common" },
+  { player: "Erling Haaland", club: "Manchester City", season: "2022/23", number: 9, rarity: "common" },
+  { player: "Mohamed Salah", club: "Liverpool", season: "2018/19", number: 11, rarity: "common" },
+  { player: "Harry Kane", club: "Tottenham", season: "2017/18", number: 10, rarity: "common" },
+  { player: "Robert Lewandowski", club: "Bayern Munich", season: "2019/20", number: 9, rarity: "common" },
+  { player: "Sergio Agüero", club: "Manchester City", season: "2014/15", number: 10, rarity: "common" },
+  { player: "Karim Benzema", club: "Real Madrid", season: "2021/22", number: 9, rarity: "common" },
+  { player: "Thierry Henry", club: "Arsenal", season: "2003/04", number: 14, rarity: "common" },
+  { player: "Ronaldinho", club: "FC Barcelona", season: "2005/06", number: 10, rarity: "common" },
+  { player: "Wayne Rooney", club: "Manchester United", season: "2009/10", number: 10, rarity: "common" },
+  { player: "David Beckham", club: "Real Madrid", season: "2004/05", number: 23, rarity: "rare" },
+  { player: "Kaká", club: "AC Milan", season: "2006/07", number: 22, rarity: "rare" },
+  { player: "Andrea Pirlo", club: "Juventus", season: "2012/13", number: 21, rarity: "rare" },
+  { player: "Steven Gerrard", club: "Liverpool", season: "2008/09", number: 8, rarity: "rare" },
+  { player: "Frank Lampard", club: "Chelsea", season: "2009/10", number: 8, rarity: "rare" },
+  { player: "Xavi", club: "FC Barcelona", season: "2010/11", number: 6, rarity: "rare" },
+  { player: "Andrés Iniesta", club: "FC Barcelona", season: "2010/11", number: 8, rarity: "rare" },
+  { player: "Sergio Ramos", club: "Real Madrid", season: "2013/14", number: 4, rarity: "rare" },
+  { player: "Gerard Piqué", club: "FC Barcelona", season: "2014/15", number: 3, rarity: "rare" },
+  { player: "Luka Modrić", club: "Real Madrid", season: "2017/18", number: 10, rarity: "rare" },
+  { player: "Kevin De Bruyne", club: "Manchester City", season: "2018/19", number: 17, rarity: "rare" },
+  { player: "Paul Pogba", club: "Manchester United", season: "2018/19", number: 6, rarity: "rare" },
+  { player: "Didier Drogba", club: "Chelsea", season: "2009/10", number: 11, rarity: "rare" },
+  { player: "Luis Suárez", club: "FC Barcelona", season: "2015/16", number: 9, rarity: "rare" },
+  { player: "Thomas Müller", club: "Bayern Munich", season: "2013/14", number: 25, rarity: "rare" },
+  { player: "Zinédine Zidane", club: "Real Madrid", season: "2005/06", number: 5, rarity: "epic" },
+  { player: "Ronaldo", club: "Real Madrid", season: "2003/04", number: 11, rarity: "epic" },
+  { player: "Francesco Totti", club: "AS Roma", season: "2006/07", number: 10, rarity: "epic" },
+  { player: "Alessandro Del Piero", club: "Juventus", season: "2005/06", number: 10, rarity: "epic" },
+  { player: "Carlos Tevez", club: "Manchester United", season: "2008/09", number: 32, rarity: "epic" },
+  { player: "Kaká", club: "Real Madrid", season: "2009/10", number: 8, rarity: "epic" },
+  { player: "Zlatan Ibrahimović", club: "AC Milan", season: "2011/12", number: 11, rarity: "epic" },
+  { player: "Ronaldo", club: "AC Milan", season: "2007/08", number: 99, rarity: "legend" },
+  { player: "Ronaldinho", club: "AC Milan", season: "2008/09", number: 80, rarity: "legend" },
+  { player: "Pavel Nedvěd", club: "Juventus", season: "2003/04", number: 11, rarity: "legend" },
+];
+
+const RARITY = {
+  common: { label: "Commun", bonus: 1, color: "#9aa4b2", rating: 1100 },
+  rare:   { label: "Rare", bonus: 3, color: "#5ad1ff", rating: 1300 },
+  epic:   { label: "Épique", bonus: 5, color: "#c77dff", rating: 1600 },
+  legend: { label: "Légendaire", bonus: 10, color: "#ffd166", rating: 1900 },
+};
+const TITLES = [
+  { min: 0, t: "Recrue" }, { min: 1000, t: "Supporter" }, { min: 1200, t: "Connaisseur" },
+  { min: 1400, t: "Expert" }, { min: 1600, t: "Maître des numéros" }, { min: 1800, t: "👑 Roi des numéros" },
+];
+const titleFor = (elo) => TITLES.reduce((a, x) => (elo >= x.min ? x.t : a), "Recrue");
+
+/* ---------- persistance locale (localStorage + repli mémoire) ---------- */
+const mem = {};
+const store = {
+  ok: (() => { try { localStorage.setItem("__t", "1"); localStorage.removeItem("__t"); return true; } catch { return false; } })(),
+  get(k, def) { try { if (this.ok) { const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; } } catch {} return k in mem ? mem[k] : def; },
+  set(k, v) { mem[k] = v; try { if (this.ok) localStorage.setItem(k, JSON.stringify(v)); } catch {} },
+};
+
+/* ---------- classement : Firebase (window.KingDB) ou repli local ---------- */
+const localSubs = [];
+const localList = () => Object.values(store.get("kings", {})).sort((a, b) => b.elo - a.elo);
+const localDB = {
+  ready: false,
+  async saveProfile(p) { const all = store.get("kings", {}); all[p.id] = p; store.set("kings", all); localSubs.forEach((cb) => cb(localList())); },
+  subscribeLeaderboard(cb) { localSubs.push(cb); cb(localList()); return () => { const i = localSubs.indexOf(cb); if (i >= 0) localSubs.splice(i, 1); }; },
+};
+const getDB = () => (window.KingDB ? window.KingDB : localDB);
+
+/* ---------- utils ---------- */
+const norm = (s) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9 ]/g, "").trim();
+const nameMatches = (input, player) => {
+  const i = norm(input); if (!i) return false;
+  const full = norm(player); const parts = full.split(" "); const last = parts[parts.length - 1];
+  if (i === full || i === last) return true;
+  if (i.length >= 4 && parts.includes(i)) return true;
+  return false;
+};
+const timeScore = (sec) => (sec <= 5 ? 10 : sec <= 15 ? 7 : 5);
+const shuffle = (a) => [...a].sort(() => Math.random() - 0.5);
+const uid = () => "u_" + Math.random().toString(36).slice(2, 10);
+
+const C = { bg: "#0a0e14", panel: "#121822", line: "#1f2937", lime: "#c6ff00", ink: "#e7ecf3", mute: "#7b8794", red: "#ff5d5d", green: "#3ee08a" };
+
+function Confetti() {
+  const bits = useMemo(() => Array.from({ length: 60 }, () => ({
+    l: Math.random() * 100, d: Math.random() * 0.6, dur: 1.4 + Math.random() * 1.2,
+    c: [C.lime, "#5ad1ff", "#ffd166", "#ff7eb6", "#fff"][Math.floor(Math.random() * 5)], s: 6 + Math.random() * 8,
+  })), []);
+  return (
+    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", overflow: "hidden", zIndex: 50 }}>
+      {bits.map((b, i) => (
+        <div key={i} style={{ position: "absolute", top: -20, left: b.l + "%", width: b.s, height: b.s * 0.5,
+          background: b.c, borderRadius: 2, animation: `fall ${b.dur}s ${b.d}s ease-in forwards` }} />
+      ))}
+    </div>
+  );
+}
+
+function App() {
+  const [profile, setProfile] = useState(() => {
+    let p = store.get("profile", null);
+    if (!p) { p = { id: uid(), pseudo: "", elo: 1200, games: 0, best: 0 }; store.set("profile", p); }
+    return p;
+  });
+  const [screen, setScreen] = useState(profile.pseudo ? "home" : "onboard");
+  const save = (patch) => setProfile((p) => {
+    const np = { ...p, ...patch }; store.set("profile", np);
+    if (np.pseudo) getDB().saveProfile(np); return np;
+  });
+  const go = (s) => setScreen(s);
+  return (
+    <div style={{ minHeight: "100dvh", background: C.bg, color: C.ink, fontFamily: "Sora, sans-serif",
+      backgroundImage: "radial-gradient(900px 500px at 80% -10%, rgba(198,255,0,.08), transparent 60%), radial-gradient(700px 400px at -10% 110%, rgba(90,209,255,.07), transparent 60%)" }}>
+      <div style={{ maxWidth: 460, margin: "0 auto", padding: "20px 16px 40px" }}>
+        {screen === "onboard" && <Onboard save={save} go={go} />}
+        {screen === "home" && <HomeScreen go={go} profile={profile} />}
+        {(screen === "quiz" || screen === "reverse") && <Game mode={screen} go={go} profile={profile} save={save} />}
+        {screen === "duel" && <Duel go={go} />}
+        {screen === "board" && <Leaderboard go={go} profile={profile} />}
+      </div>
+    </div>
+  );
+}
+
+function Onboard({ save, go }) {
+  const [v, setV] = useState("");
+  return (
+    <div style={{ marginTop: 60, textAlign: "center" }}>
+      <h1 style={{ fontFamily: "Anton, sans-serif", fontSize: 48, lineHeight: .9, textTransform: "uppercase" }}>
+        Roi des <span style={{ color: C.lime }}>Numéros</span></h1>
+      <p style={{ color: C.mute, margin: "16px 0 24px" }}>Choisis ton pseudo pour entrer au classement.</p>
+      <input value={v} maxLength={20} onChange={(e) => setV(e.target.value)} placeholder="Ton pseudo…"
+        onKeyDown={(e) => e.key === "Enter" && v.trim() && (save({ pseudo: v.trim() }), go("home"))}
+        style={{ width: "100%", background: "#0c1119", border: `1px solid ${C.line}`, color: C.ink, borderRadius: 14, padding: 16, fontSize: 17, outline: "none", fontFamily: "Sora", textAlign: "center" }} />
+      <button disabled={!v.trim()} onClick={() => { save({ pseudo: v.trim() }); go("home"); }}
+        style={{ ...btnPrimary, background: v.trim() ? C.lime : "#1c2531", color: v.trim() ? "#0a0e14" : C.mute }}>C'est parti</button>
+    </div>
+  );
+}
+
+function HomeScreen({ go, profile }) {
+  const Mode = ({ emoji, title, sub, color, onClick }) => (
+    <button onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 14, width: "100%", textAlign: "left",
+      background: C.panel, border: `1px solid ${C.line}`, borderRadius: 18, padding: 16, cursor: "pointer", color: C.ink, animation: "pop .3s ease both" }}>
+      <div style={{ width: 46, height: 46, borderRadius: 12, display: "grid", placeItems: "center", background: `${color}1a`, flexShrink: 0 }}>{ic(emoji, 22)}</div>
+      <div style={{ flex: 1 }}><div style={{ fontWeight: 800, fontSize: 17 }}>{title}</div><div style={{ color: C.mute, fontSize: 13 }}>{sub}</div></div>
+      {ic("›", 22)}
+    </button>
+  );
+  return (
+    <div>
+      <div style={{ textAlign: "center", marginBottom: 8 }}>
+        <div style={{ color: C.lime, letterSpacing: 4, fontSize: 12, fontWeight: 700 }}>SALUT {profile.pseudo.toUpperCase()}</div>
+        <h1 style={{ fontFamily: "Anton, sans-serif", fontSize: 52, lineHeight: .9, margin: "6px 0 0", textTransform: "uppercase", letterSpacing: -1 }}>
+          Roi des<br /><span style={{ color: C.lime }}>Numéros</span></h1>
+      </div>
+      <button onClick={() => go("board")} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%",
+        background: C.panel, border: `1px solid ${C.line}`, borderRadius: 14, padding: "10px 14px", margin: "16px 0 22px", cursor: "pointer", color: C.ink }}>
+        {ic("👑", 18)}<span style={{ color: C.mute, fontSize: 13 }}>Rang :</span><strong>{titleFor(profile.elo)}</strong>
+        <span style={{ marginLeft: "auto", fontFamily: "Anton", fontSize: 20, color: C.lime }}>{profile.elo}</span><span style={{ color: C.mute, fontSize: 11 }}>ELO</span>
+      </button>
+      <div style={{ display: "grid", gap: 12 }}>
+        <Mode emoji="🎯" color={C.lime} title="Qui portait ce numéro ?" sub="Club + saison + numéro → le joueur" onClick={() => go("quiz")} />
+        <Mode emoji="🔁" color="#5ad1ff" title="Mode Inversé" sub="Joueur + club + saison → le numéro" onClick={() => go("reverse")} />
+        <Mode emoji="⚔️" color="#ff7eb6" title="Mode Duel" sub="2 joueurs, vol de réponse, → 100 pts" onClick={() => go("duel")} />
+        <Mode emoji="🏅" color="#ffd166" title="Classement" sub="Qui est le vrai roi des numéros ?" onClick={() => go("board")} />
+      </div>
+      <p style={{ color: C.mute, fontSize: 12, textAlign: "center", marginTop: 24, lineHeight: 1.6 }}>
+        Chrono : &lt;5s = 10 · 5–15s = 7 · &gt;15s = 5 pts · + bonus rareté</p>
+    </div>
+  );
+}
+
+function Game({ mode, go, profile, save }) {
+  const deck = useRef(shuffle(DB));
+  const [idx, setIdx] = useState(0);
+  const [val, setVal] = useState("");
+  const [phase, setPhase] = useState("ask");
+  const [last, setLast] = useState(null);
+  const [score, setScore] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [elo, setElo] = useState(profile.elo);
+  const [confetti, setConfetti] = useState(false);
+  const startRef = useRef(Date.now());
+  const inputRef = useRef(null);
+  const q = deck.current[idx % deck.current.length];
+  const r = RARITY[q.rarity];
+  useEffect(() => { startRef.current = Date.now(); setTimeout(() => inputRef.current && inputRef.current.focus(), 50); }, [idx]);
+  const submit = () => {
+    if (phase !== "ask" || val === "") return;
+    const sec = (Date.now() - startRef.current) / 1000;
+    let correct = false, pts = 0, exact = false;
+    if (mode === "quiz") { correct = nameMatches(val, q.player); if (correct) pts = timeScore(sec) + r.bonus; }
+    else { const g = parseInt(val, 10);
+      if (g === q.number) { correct = true; exact = true; pts = 10 + r.bonus; }
+      else if (Math.abs(g - q.number) === 1) { correct = true; pts = 3; } }
+    if (exact) { setConfetti(true); setTimeout(() => setConfetti(false), 2200); }
+    setScore((s) => s + pts); setStreak((k) => (correct ? k + 1 : 0));
+    setElo((e) => { const exp = 1 / (1 + 10 ** ((r.rating - e) / 400)); return Math.round(e + 24 * ((correct ? 1 : 0) - exp)); });
+    setLast({ correct, pts, sec: sec.toFixed(1), exact }); setPhase("result");
+  };
+  const next = () => {
+    if (idx >= 9) { save({ elo, games: profile.games + 1, best: Math.max(profile.best, score) }); go("board"); return; }
+    setVal(""); setLast(null); setPhase("ask"); setIdx((i) => i + 1);
+  };
+  return (
+    <div>
+      {confetti && <Confetti />}
+      <TopBar go={go} title={mode === "quiz" ? "Qui portait ce numéro ?" : "Mode Inversé"} right={`Q ${idx + 1}/10`} />
+      <div style={{ display: "flex", justifyContent: "space-between", margin: "14px 2px 18px", fontSize: 13 }}>
+        <span style={{ color: C.mute }}>Score <strong style={{ color: C.ink }}>{score}</strong></span>
+        <span style={{ color: streak > 1 ? C.lime : C.mute }}>{streak > 1 ? `⚡ ${streak} d'affilée` : "Série 0"}</span>
+        <span style={{ color: C.mute }}>ELO <strong style={{ color: C.lime }}>{elo}</strong></span>
+      </div>
+      <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 22, padding: 22, position: "relative", overflow: "hidden", animation: "pop .25s ease both" }}>
+        <span style={{ position: "absolute", top: 14, right: 16, fontSize: 11, fontWeight: 700, color: r.color, border: `1px solid ${r.color}55`, borderRadius: 999, padding: "3px 10px" }}>{r.label} +{r.bonus}</span>
+        {mode === "quiz" ? (
+          <>
+            <div style={{ color: C.mute, fontSize: 13, marginTop: 6 }}>{q.club}</div>
+            <div style={{ color: C.mute, fontSize: 13 }}>Saison {q.season}</div>
+            <div style={{ fontFamily: "Anton", fontSize: 96, lineHeight: 1, color: C.lime, margin: "6px 0 2px" }}>{q.number}</div>
+            <div style={{ color: C.mute, fontSize: 13 }}>Quel joueur portait ce numéro ?</div>
+          </>
+        ) : (
+          <>
+            <div style={{ fontFamily: "Anton", fontSize: 34, lineHeight: 1.05, margin: "8px 0 4px", textTransform: "uppercase" }}>{q.player}</div>
+            <div style={{ color: C.mute, fontSize: 14 }}>{q.club} · {q.season}</div>
+            <div style={{ color: C.mute, fontSize: 13, marginTop: 12 }}>Quel numéro portait-il ?</div>
+          </>
+        )}
+      </div>
+      {phase === "ask" ? (
+        <div style={{ marginTop: 16 }}>
+          <input ref={inputRef} value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && submit()}
+            inputMode={mode === "reverse" ? "numeric" : "text"} placeholder={mode === "reverse" ? "Numéro…" : "Nom du joueur…"}
+            style={{ width: "100%", background: "#0c1119", border: `1px solid ${C.line}`, color: C.ink, borderRadius: 14, padding: 16, fontSize: 17, outline: "none", fontFamily: "Sora" }} />
+          <button onClick={submit} disabled={val === ""} style={{ ...btnPrimary, background: val === "" ? "#1c2531" : C.lime, color: val === "" ? C.mute : "#0a0e14" }}>Valider</button>
+        </div>
+      ) : (
+        <div style={{ marginTop: 16, animation: "pop .2s ease both" }}>
+          <div style={{ background: last.correct ? `${C.green}14` : `${C.red}14`, border: `1px solid ${last.correct ? C.green : C.red}55`, borderRadius: 16, padding: 16 }}>
+            <div style={{ fontWeight: 800, color: last.correct ? C.green : C.red, fontSize: 16 }}>
+              {last.exact ? "🎯 Parfait !" : last.correct ? "✅ Bonne réponse" : "❌ Raté"}
+              {last.pts > 0 && <span style={{ float: "right", fontFamily: "Anton" }}>+{last.pts}</span>}
+            </div>
+            <div style={{ marginTop: 8, fontSize: 15 }}>{mode === "quiz" ? <><strong>{q.player}</strong> — {q.number}</> : <><strong>N° {q.number}</strong> · {q.player}</>}</div>
+            {mode === "quiz" && <div style={{ color: C.mute, fontSize: 12, marginTop: 4 }}>en {last.sec}s</div>}
+          </div>
+          <button onClick={next} style={btnPrimary}>{idx >= 9 ? "Terminer 🏆" : "Suivant ›"}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Duel({ go }) {
+  const deck = useRef(shuffle(DB.filter((d) => d.rarity !== "common").concat(DB)).slice(0, 40));
+  const [i, setI] = useState(0); const [turn, setTurn] = useState(0);
+  const [sa, setSa] = useState(0); const [sb, setSb] = useState(0);
+  const [val, setVal] = useState(""); const [step, setStep] = useState("answer"); const [msg, setMsg] = useState("");
+  const startRef = useRef(Date.now());
+  const q = deck.current[i % deck.current.length]; const r = RARITY[q.rarity];
+  const names = ["Joueur A", "Joueur B"]; const colors = ["#5ad1ff", "#ff7eb6"];
+  const winner = sa >= 100 ? 0 : sb >= 100 ? 1 : null;
+  useEffect(() => { startRef.current = Date.now(); }, [i, step]);
+  const award = (w, p) => (w === 0 ? setSa((s) => s + p) : setSb((s) => s + p));
+  const tryAnswer = () => {
+    if (val === "") return;
+    const sec = (Date.now() - startRef.current) / 1000; const ok = nameMatches(val, q.player);
+    if (step === "answer") {
+      if (ok) { const p = timeScore(sec) + r.bonus; award(turn, p); setMsg(`✅ ${names[turn]} +${p}`); setStep("reveal"); }
+      else { setMsg(`❌ ${names[turn]} se trompe. ${names[1 - turn]} peut voler !`); setVal(""); setStep("steal"); }
+    } else { const st = 1 - turn; if (ok) { award(st, 5); setMsg(`🦹 ${names[st]} vole la réponse +5`); } else setMsg("Personne ne marque."); setStep("reveal"); }
+  };
+  const next = () => { setVal(""); setMsg(""); setStep("answer"); setTurn((t) => 1 - t); setI((x) => x + 1); };
+  if (winner !== null) return (
+    <div><Confetti /><TopBar go={go} title="Mode Duel" right="" />
+      <div style={{ textAlign: "center", marginTop: 60 }}>{ic("👑", 56)}
+        <h2 style={{ fontFamily: "Anton", fontSize: 40, margin: "12px 0 4px", color: colors[winner] }}>{names[winner]} gagne !</h2>
+        <p style={{ color: C.mute }}>{sa} – {sb}</p>
+        <button onClick={() => go("home")} style={btnPrimary}>Retour à l'accueil</button></div>
+    </div>
+  );
+  return (
+    <div>
+      <TopBar go={go} title="Mode Duel" right="→ 100 pts" />
+      <div style={{ display: "flex", gap: 10, margin: "14px 0 18px" }}>
+        {names.map((n, k) => (
+          <div key={k} style={{ flex: 1, background: turn === k && step === "answer" ? `${colors[k]}1a` : C.panel,
+            border: `1px solid ${turn === k && step === "answer" ? colors[k] : C.line}`, borderRadius: 14, padding: 12, textAlign: "center", transition: "all .2s" }}>
+            <div style={{ color: colors[k], fontSize: 12, fontWeight: 700 }}>{n}</div>
+            <div style={{ fontFamily: "Anton", fontSize: 30 }}>{k === 0 ? sa : sb}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ textAlign: "center", fontSize: 13, marginBottom: 10, animation: step === "steal" ? "pulse 1s infinite" : "none",
+        color: step === "steal" ? colors[1 - turn] : C.mute, fontWeight: step === "steal" ? 700 : 400 }}>
+        {step === "steal" ? `À ${names[1 - turn]} de voler !` : `Au tour de ${names[turn]}`}
+      </div>
+      <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 20, padding: 20, position: "relative" }}>
+        <span style={{ position: "absolute", top: 12, right: 14, fontSize: 11, fontWeight: 700, color: r.color, border: `1px solid ${r.color}55`, borderRadius: 999, padding: "2px 9px" }}>{r.label} +{r.bonus}</span>
+        <div style={{ color: C.mute, fontSize: 13 }}>{q.club} · {q.season}</div>
+        <div style={{ fontFamily: "Anton", fontSize: 80, lineHeight: 1, color: C.lime, margin: "4px 0" }}>{q.number}</div>
+        <div style={{ color: C.mute, fontSize: 13 }}>Qui portait ce numéro ?</div>
+      </div>
+      {step !== "reveal" ? (
+        <div style={{ marginTop: 14 }}>
+          {msg && <div style={{ color: C.mute, fontSize: 13, marginBottom: 8 }}>{msg}</div>}
+          <input value={val} onChange={(e) => setVal(e.target.value)} onKeyDown={(e) => e.key === "Enter" && tryAnswer()} placeholder="Nom du joueur…"
+            style={{ width: "100%", background: "#0c1119", border: `1px solid ${C.line}`, color: C.ink, borderRadius: 14, padding: 16, fontSize: 17, outline: "none", fontFamily: "Sora" }} />
+          <button onClick={tryAnswer} style={btnPrimary}>{step === "steal" ? "Voler la réponse" : "Valider"}</button>
+        </div>
+      ) : (
+        <div style={{ marginTop: 14, animation: "pop .2s ease both" }}>
+          <div style={{ background: "#0c1119", border: `1px solid ${C.line}`, borderRadius: 16, padding: 16 }}>
+            <div style={{ fontWeight: 700 }}>{msg}</div>
+            <div style={{ marginTop: 6, color: C.mute, fontSize: 14 }}>Réponse : <strong style={{ color: C.ink }}>{q.player}</strong></div>
+          </div>
+          <button onClick={next} style={btnPrimary}>Question suivante</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Leaderboard({ go, profile }) {
+  const [list, setList] = useState([]);
+  const [live, setLive] = useState(getDB().ready);
+  useEffect(() => {
+    const sub = () => { setLive(getDB().ready); return getDB().subscribeLeaderboard(setList); };
+    let unsub = sub();
+    const onReady = () => { if (unsub) unsub(); unsub = sub(); };
+    window.addEventListener("kingdb-ready", onReady);
+    return () => { if (unsub) unsub(); window.removeEventListener("kingdb-ready", onReady); };
+  }, []);
+  const medals = ["#ffd166", "#c0c8d4", "#cd7f4d"];
+  return (
+    <div>
+      <TopBar go={go} title="Classement" right={live ? "● en direct" : "local"} />
+      <div style={{ textAlign: "center", margin: "18px 0" }}>{ic("👑", 40)}
+        <div style={{ color: C.mute, fontSize: 13, marginTop: 4 }}>Le vrai roi des numéros</div></div>
+      {list.length === 0 ? (
+        <p style={{ color: C.mute, textAlign: "center", marginTop: 30 }}>Aucune partie enregistrée. Joue une manche !</p>
+      ) : (
+        <div style={{ display: "grid", gap: 8 }}>
+          {list.map((p, i) => {
+            const me = p.id === profile.id;
+            return (
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: me ? `${C.lime}12` : C.panel,
+                border: `1px solid ${me ? C.lime + "55" : C.line}`, borderRadius: 14, padding: "12px 14px" }}>
+                <div style={{ fontFamily: "Anton", fontSize: 20, width: 28, textAlign: "center", color: medals[i] || C.mute }}>{i + 1}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 700 }}>{p.pseudo}{me && " (toi)"}</div>
+                  <div style={{ color: C.mute, fontSize: 12 }}>{titleFor(p.elo)} · {p.games || 0} parties</div>
+                </div>
+                <div style={{ fontFamily: "Anton", fontSize: 22, color: C.lime }}>{p.elo}</div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {!live && <p style={{ color: C.mute, fontSize: 12, textAlign: "center", marginTop: 20, lineHeight: 1.6 }}>
+        Classement local. Renseigne ta config Firebase en haut du fichier pour le partage entre joueurs.</p>}
+      <button onClick={() => go("home")} style={btnPrimary}>Rejouer</button>
+    </div>
+  );
+}
+
+function TopBar({ go, title, right }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <button onClick={() => go("home")} style={{ background: C.panel, border: `1px solid ${C.line}`, color: C.ink, borderRadius: 10, width: 38, height: 38, display: "grid", placeItems: "center", cursor: "pointer" }}>{ic("🏠", 18)}</button>
+      <div style={{ fontWeight: 800, fontSize: 15, flex: 1 }}>{title}</div>
+      <span style={{ color: C.mute, fontSize: 13 }}>{right}</span>
+    </div>
+  );
+}
+const btnPrimary = { width: "100%", background: C.lime, color: "#0a0e14", border: "none", borderRadius: 14, padding: 16, fontWeight: 800, fontSize: 16, cursor: "pointer", fontFamily: "Sora", marginTop: 16 };
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
