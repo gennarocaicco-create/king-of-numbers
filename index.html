@@ -158,6 +158,24 @@ const localDB = {
 };
 const getDB = () => (window.KingDB ? window.KingDB : localDB);
 
+/* ---------- abonnement robuste au classement (bascule sur Firebase dès qu'il est prêt) ---------- */
+function subscribeKings(onList, onLive) {
+  let unsub = () => {};
+  let poll = null;
+  const start = () => {
+    const db = window.KingDB || localDB;
+    if (onLive) onLive(!!window.KingDB);
+    unsub = db.subscribeLeaderboard(onList) || (() => {});
+  };
+  start();
+  if (!window.KingDB) {
+    poll = setInterval(() => {
+      if (window.KingDB) { clearInterval(poll); poll = null; unsub(); start(); }
+    }, 250);
+  }
+  return () => { if (poll) clearInterval(poll); unsub(); };
+}
+
 /* ---------- code admin (change-le si tu veux) ---------- */
 const ADMIN_CODE = "Berlin";
 
@@ -234,7 +252,7 @@ function Onboard({ save, go }) {
   const [list, setList] = useState([]);
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => { const u = getDB().subscribeLeaderboard(setList); return () => u && u(); }, []);
+  useEffect(() => subscribeKings(setList), []);
 
   const submit = async () => {
     const name = v.trim();
@@ -525,13 +543,7 @@ function Leaderboard({ go, profile }) {
   const [live, setLive] = useState(getDB().ready);
   const [reload, setReload] = useState(0);
   const [spin, setSpin] = useState(false);
-  useEffect(() => {
-    const sub = () => { setLive(getDB().ready); return getDB().subscribeLeaderboard(setList); };
-    let unsub = sub();
-    const onReady = () => { if (unsub) unsub(); unsub = sub(); };
-    window.addEventListener("kingdb-ready", onReady);
-    return () => { if (unsub) unsub(); window.removeEventListener("kingdb-ready", onReady); };
-  }, [reload]);
+  useEffect(() => subscribeKings(setList, setLive), [reload]);
   const refresh = () => { setSpin(true); setReload((n) => n + 1); setTimeout(() => setSpin(false), 600); };
   const medals = ["#ffd166", "#c0c8d4", "#cd7f4d"];
   return (
@@ -581,7 +593,7 @@ function Admin({ go }) {
   const [ok, setOk] = useState(false);
   const [err, setErr] = useState("");
   const [list, setList] = useState([]);
-  useEffect(() => { if (!ok) return; const u = getDB().subscribeLeaderboard(setList); return () => u && u(); }, [ok]);
+  useEffect(() => { if (!ok) return; return subscribeKings(setList); }, [ok]);
 
   const tryLogin = () => {
     if (code === ADMIN_CODE) { setOk(true); setErr(""); }
