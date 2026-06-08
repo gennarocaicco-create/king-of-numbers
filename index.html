@@ -125,6 +125,16 @@ const DB = [
   { player: "Ronaldo", club: "AC Milan", season: "2007/08", number: 99, rarity: "legend" },
   { player: "Ronaldinho", club: "AC Milan", season: "2008/09", number: 80, rarity: "legend" },
   { player: "Pavel Nedvěd", club: "Juventus", season: "2003/04", number: 11, rarity: "legend" },
+  { player: "Thierry Henry", club: "Juventus", season: "1998/99", number: 6, rarity: "legend", note: "L'éternel n°14 d'Arsenal portait le 6 lors de son unique demi-saison à la Juve." },
+  { player: "Diego Forlán", club: "Villarreal", season: "2005/06", number: 5, rarity: "legend", note: "Un buteur (futur n°7 de l'Atlético) avec un numéro de défenseur central." },
+  { player: "Vincent Kompany", club: "Hamburger SV", season: "2006/07", number: 10, rarity: "legend", note: "Défenseur central… en n°10. Il deviendra l'iconique n°4 de Man City." },
+  { player: "Guillermo Ochoa", club: "Standard Liège", season: "2017/18", number: 8, rarity: "legend", note: "Un gardien en n°8 : un clin d'œil à « ocho » (huit en espagnol)." },
+  { player: "Asamoah Gyan", club: "Sélection du Ghana", season: "2010", number: 3, rarity: "legend", note: "Un attaquant qui a porté le n°3 toute sa carrière, hérité de son frère." },
+  { player: "Hatem Ben Arfa", club: "Real Valladolid", season: "2019/20", number: 3, rarity: "legend", note: "Meneur de jeu en n°3, « parce que ça fait joli sur le maillot »." },
+  { player: "Raphaël Varane", club: "Real Madrid", season: "2011/12", number: 19, rarity: "legend", note: "Son tout premier numéro au Real, avant de passer au n°2 dès la saison suivante." },
+  { player: "Cristiano Ronaldo", club: "Sporting CP", season: "2002/03", number: 28, rarity: "legend", note: "Son tout premier numéro en pro, bien avant de devenir le mythique CR7." },
+  { player: "Kylian Mbappé", club: "AS Monaco", season: "2016/17", number: 29, rarity: "legend", note: "Le futur n°7 portait le 29 lors de son explosion à Monaco." },
+  { player: "Lionel Messi", club: "FC Barcelona", season: "2004/05", number: 30, rarity: "legend", note: "Son tout premier numéro au Barça lors de ses débuts, bien avant le n°10." },
 ];
 
 const RARITY = {
@@ -237,7 +247,7 @@ function App() {
         {screen === "onboard" && <Onboard save={save} go={go} />}
         {screen === "setpwd" && <SetPwd profile={profile} save={save} go={go} />}
         {screen === "home" && <HomeScreen go={go} profile={profile} />}
-        {(screen === "quiz" || screen === "reverse") && <Game mode={screen} go={go} profile={profile} save={save} />}
+        {(screen === "quiz" || screen === "reverse" || screen === "legend") && <Game mode={screen} go={go} profile={profile} save={save} />}
         {screen === "duel" && <Duel go={go} />}
         {screen === "board" && <Leaderboard go={go} profile={profile} />}
         {screen === "admin" && <Admin go={go} />}
@@ -354,6 +364,7 @@ function HomeScreen({ go, profile }) {
         <Mode emoji="🎯" color={C.lime} title="Qui portait ce numéro ?" sub="Club + saison + numéro → le joueur" onClick={() => go("quiz")} />
         <Mode emoji="🔁" color="#5ad1ff" title="Mode Inversé" sub="Joueur + club + saison → le numéro" onClick={() => go("reverse")} />
         <Mode emoji="⚔️" color="#ff7eb6" title="Mode Duel" sub="2 joueurs, vol de réponse, → 100 pts" onClick={() => go("duel")} />
+        <Mode emoji="🐐" color="#ffd166" title="Mode Légendaire" sub="Les numéros les plus surprenants de l'histoire" onClick={() => go("legend")} />
         <Mode emoji="🏅" color="#ffd166" title="Classement" sub="Qui est le vrai roi des numéros ?" onClick={() => go("board")} />
       </div>
       <p style={{ color: C.mute, fontSize: 12, textAlign: "center", marginTop: 24, lineHeight: 1.6 }}>
@@ -363,7 +374,7 @@ function HomeScreen({ go, profile }) {
 }
 
 function Game({ mode, go, profile, save }) {
-  const deck = useRef(shuffle(DB));
+  const deck = useRef(shuffle(mode === "legend" ? DB.filter((d) => d.rarity === "legend") : DB));
   const [idx, setIdx] = useState(0);
   const [val, setVal] = useState("");
   const [phase, setPhase] = useState("ask");
@@ -388,7 +399,7 @@ function Game({ mode, go, profile, save }) {
     if (phase !== "ask" || val === "") return;
     const sec = (Date.now() - startRef.current) / 1000;
     let correct = false, pts = 0, exact = false;
-    if (mode === "quiz") { correct = nameMatches(val, q.player); if (correct) pts = timeScore(sec) + r.bonus; }
+    if (mode !== "reverse") { correct = nameMatches(val, q.player); if (correct) pts = timeScore(sec) + r.bonus; }
     else { const g = parseInt(val, 10);
       if (g === q.number) { correct = true; exact = true; pts = 10 + r.bonus; }
       else if (Math.abs(g - q.number) === 1) { correct = true; pts = 3; } }
@@ -404,7 +415,7 @@ function Game({ mode, go, profile, save }) {
   return (
     <div>
       {confetti && <Confetti />}
-      <TopBar go={go} title={mode === "quiz" ? "Qui portait ce numéro ?" : "Mode Inversé"} right={`Q ${idx + 1}/10`} />
+      <TopBar go={go} title={mode === "reverse" ? "Mode Inversé" : mode === "legend" ? "🐐 Mode Légendaire" : "Qui portait ce numéro ?"} right={`Q ${idx + 1}/10`} />
       <div style={{ display: "flex", justifyContent: "space-between", margin: "14px 2px 18px", fontSize: 13 }}>
         <span style={{ color: C.mute }}>Score <strong style={{ color: C.ink }}>{score}</strong></span>
         <span style={{ color: streak > 1 ? C.lime : C.mute }}>{streak > 1 ? `⚡ ${streak} d'affilée` : "Série 0"}</span>
@@ -420,7 +431,7 @@ function Game({ mode, go, profile, save }) {
       )}
       <div style={{ background: C.panel, border: `1px solid ${C.line}`, borderRadius: 22, padding: 22, position: "relative", overflow: "hidden", animation: "pop .25s ease both" }}>
         <span style={{ position: "absolute", top: 14, right: 16, fontSize: 11, fontWeight: 700, color: r.color, border: `1px solid ${r.color}55`, borderRadius: 999, padding: "3px 10px" }}>{r.label} +{r.bonus}</span>
-        {mode === "quiz" ? (
+        {mode !== "reverse" ? (
           <>
             <div style={{ color: C.mute, fontSize: 13, marginTop: 6 }}>{q.club}</div>
             <div style={{ color: C.mute, fontSize: 13 }}>Saison {q.season}</div>
@@ -449,8 +460,9 @@ function Game({ mode, go, profile, save }) {
               {last.exact ? "🎯 Parfait !" : last.correct ? "✅ Bonne réponse" : "❌ Raté"}
               {last.pts > 0 && <span style={{ float: "right", fontFamily: "Anton" }}>+{last.pts}</span>}
             </div>
-            <div style={{ marginTop: 8, fontSize: 15 }}>{mode === "quiz" ? <><strong>{q.player}</strong> — {q.number}</> : <><strong>N° {q.number}</strong> · {q.player}</>}</div>
-            {mode === "quiz" && <div style={{ color: C.mute, fontSize: 12, marginTop: 4 }}>en {last.sec}s</div>}
+            <div style={{ marginTop: 8, fontSize: 15 }}>{mode !== "reverse" ? <><strong>{q.player}</strong> — {q.number}</> : <><strong>N° {q.number}</strong> · {q.player}</>}</div>
+            {mode !== "reverse" && <div style={{ color: C.mute, fontSize: 12, marginTop: 4 }}>en {last.sec}s</div>}
+            {q.note && <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.line}`, color: C.ink, fontSize: 13, lineHeight: 1.5 }}>💡 {q.note}</div>}
           </div>
           <button onClick={next} style={btnPrimary}>{idx >= 9 ? "Terminer 🏆" : "Suivant ›"}</button>
         </div>
