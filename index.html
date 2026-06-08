@@ -558,6 +558,11 @@ function Leaderboard({ go, profile }) {
   useEffect(() => subscribeKings(setList, setLive), [reload]);
   const refresh = () => { setSpin(true); setReload((n) => n + 1); setTimeout(() => setSpin(false), 600); };
   const medals = ["#ffd166", "#c0c8d4", "#cd7f4d"];
+  // un seul joueur par pseudo : on garde sa meilleure entrée (ELO le plus haut)
+  const byName = {};
+  list.forEach((p) => { const k = norm(p.pseudo || ""); if (k && (!byName[k] || (p.elo || 0) > (byName[k].elo || 0))) byName[k] = p; });
+  const board = Object.values(byName).sort((a, b) => (b.elo || 0) - (a.elo || 0));
+  const myName = norm(profile.pseudo || "");
   return (
     <div>
       <TopBar go={go} title="Classement" right={live ? "● en direct" : "local"} />
@@ -569,12 +574,12 @@ function Leaderboard({ go, profile }) {
         <span style={{ display: "inline-block", animation: spin ? "spin .6s linear" : "none" }}>🔄</span>
         {spin ? "Actualisation…" : "Actualiser le classement"}
       </button>
-      {list.length === 0 ? (
+      {board.length === 0 ? (
         <p style={{ color: C.mute, textAlign: "center", marginTop: 30 }}>Aucune partie enregistrée. Joue une manche !</p>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
-          {list.map((p, i) => {
-            const me = p.id === profile.id;
+          {board.map((p, i) => {
+            const me = norm(p.pseudo || "") === myName;
             return (
               <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 12, background: me ? `${C.lime}12` : C.panel,
                 border: `1px solid ${me ? C.lime + "55" : C.line}`, borderRadius: 14, padding: "12px 14px" }}>
